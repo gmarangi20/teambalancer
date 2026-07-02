@@ -125,7 +125,7 @@
       <div>
         <h3 class="text-[var(--ink)] font-semibold mb-1">2. Punteggio di ogni giocatore</h3>
         <p>Ogni giocatore ha uno Score, basato sulla media pesata delle 5 statistiche. Attacco, Difesa e Tecnica contano un po' di più (peso 1.0), Resistenza e Velocità un po' meno (peso 0.8), perché nel 5vs5 incidono meno del gioco tecnico e di forza.</p>
-        <p class="mt-1">Attenzione: lo Score da solo può essere ingannevole. Un giocatore con 10/10/10/1/1 ha lo stesso Score medio di uno con 6/6/6/6/6, ma in campo si comportano in modo molto diverso (uno specialista sbilanciato contro un giocatore completo). Per questo, quando sceglie come dividere le squadre, l'algoritmo <strong>non guarda solo il punteggio totale</strong>: confronta anche il totale di ogni singola statistica tra le due squadre (Attacco vs Attacco, Difesa vs Difesa, ecc.), così evita di far finire per errore tutti i giocatori "specialisti" nella stessa squadra anche quando i punteggi medi sembrerebbero già pari. La differenza mostrata nei risultati resta comunque quella sul punteggio totale, per semplicità di lettura.</p>
+        <p class="mt-1">Attenzione: lo Score da solo può essere ingannevole. Un giocatore con 2 stats elevate ha lo stesso Score medio di uno con tutte stats medie, ma in campo si comportano in modo molto diverso (uno specialista sbilanciato contro un giocatore completo). Per questo, quando sceglie come dividere le squadre, l'algoritmo <strong>non guarda solo il punteggio totale</strong>: confronta anche il totale di ogni singola statistica tra le due squadre (Attacco vs Attacco, Difesa vs Difesa, ecc.), così evita di far finire per errore tutti i giocatori "specialisti" nella stessa squadra anche quando i punteggi medi sembrerebbero già pari. La differenza mostrata nei risultati resta comunque quella sul punteggio totale, per semplicità di lettura.</p>
       </div>
       <div>
         <h3 class="text-[var(--ink)] font-semibold mb-1">3. Come vengono formate le squadre</h3>
@@ -284,28 +284,43 @@ const STATS = [
 const WEIGHTS = {att:1, dif:1, res:0.8, vel:0.8, tec:1}; // peso leggermente maggiore su att/dif/tec
 const STORAGE_KEY = 'team_balancer_players_v1';
 
+// Scala qualitativa a 5 livelli (sostituisce lo slider numerico 1-10)
+const RATING_LEVELS = [
+  {value:1, label:'Sotto la media'},
+  {value:2, label:'Leggermente sotto la media'},
+  {value:3, label:'Nella media'},
+  {value:4, label:'Leggermente sopra la media'},
+  {value:5, label:'Sopra la media'}
+];
+function ratingLabel(v){
+  const lvl = RATING_LEVELS.find(l=>l.value===v);
+  return lvl ? lvl.label : v;
+}
+function clampRating(v){
+  v = parseInt(v, 10);
+  if(isNaN(v)) v = 3;
+  return Math.min(5, Math.max(1, v));
+}
+
 let players = [];
 let editingId = null;
 let teamSize = 5; // 5 = 5vs5 (10 giocatori), 6 = 6vs6 (12 giocatori)
 const FORMAT_KEY = 'team_balancer_format_v1';
 
-// ---------- Init sliders ----------
+// ---------- Init dropdown statistiche ----------
 const slidersWrap = document.getElementById('slidersWrap');
 STATS.forEach(s=>{
   const row = document.createElement('div');
+  const options = RATING_LEVELS.map(l=>`<option value="${l.value}" ${l.value===3?'selected':''}>${l.label}</option>`).join('');
   row.innerHTML = `
-    <div class="flex items-center justify-between mb-1">
+    <div class="mb-1">
       <label class="text-xs uppercase tracking-wider text-[var(--ink-dim)]">${s.label}</label>
-      <span class="text-sm font-bold" style="color:var(--acc)" id="val_${s.key}">5</span>
     </div>
-    <input type="range" min="1" max="10" value="5" id="slider_${s.key}" class="w-full">
+    <select id="slider_${s.key}" class="w-full bg-[#0a1810] border border-[var(--line)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--acc)] focus:border-transparent">
+      ${options}
+    </select>
   `;
   slidersWrap.appendChild(row);
-});
-STATS.forEach(s=>{
-  document.getElementById(`slider_${s.key}`).addEventListener('input', e=>{
-    document.getElementById(`val_${s.key}`).textContent = e.target.value;
-  });
 });
 
 // ---------- Persistence ----------
@@ -318,7 +333,14 @@ function saveToStorage(){
 function loadFromStorage(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw) players = JSON.parse(raw);
+    if(raw){
+      players = JSON.parse(raw);
+      // Migrazione: eventuali valori salvati con la vecchia scala 1-10 vengono
+      // riportati entro il nuovo range 1-5 (i valori già 1-5 restano invariati).
+      players.forEach(p=>{
+        STATS.forEach(s=>{ p[s.key] = clampRating(p[s.key]); });
+      });
+    }
     const fmt = localStorage.getItem(FORMAT_KEY);
     if(fmt && (fmt === '5' || fmt === '6')) teamSize = parseInt(fmt, 10);
   }catch(e){ players = []; }
@@ -355,7 +377,7 @@ document.getElementById('addPlayerBtn').addEventListener('click', ()=>{
   const group = document.getElementById('pGroup').value.trim();
   const stats = {};
   STATS.forEach(s=>{
-    stats[s.key] = parseInt(document.getElementById(`slider_${s.key}`).value, 10);
+    stats[s.key] = clampRating(document.getElementById(`slider_${s.key}`).value);
   });
   const player = {
     id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
@@ -369,8 +391,7 @@ document.getElementById('addPlayerBtn').addEventListener('click', ()=>{
   document.getElementById('pIsGK').checked = false;
   document.getElementById('pGroup').value = '';
   STATS.forEach(s=>{
-    document.getElementById(`slider_${s.key}`).value = 5;
-    document.getElementById(`val_${s.key}`).textContent = 5;
+    document.getElementById(`slider_${s.key}`).value = 3;
   });
   document.getElementById('resultsSection').classList.add('hidden');
 });
@@ -431,11 +452,16 @@ function renderPlayers(){
     if(editingId === p.id){
       // ---- RIGA IN MODALITÀ MODIFICA ----
       tr.className = 'bg-[#0a1810]';
-      const statCells = STATS.map(s=>`
+      const statCells = STATS.map(s=>{
+        const opts = RATING_LEVELS.map(l=>`<option value="${l.value}" ${l.value===p[s.key]?'selected':''}>${l.label}</option>`).join('');
+        return `
         <td class="py-2 pr-2 text-center">
-          <input type="number" min="1" max="10" value="${p[s.key]}" data-stat="${s.key}" class="editStatInput w-12 text-center bg-[#0d1f14] border border-[var(--line)] rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--acc)]">
+          <select data-stat="${s.key}" title="${s.label}" class="editStatInput w-full min-w-[70px] text-center bg-[#0d1f14] border border-[var(--line)] rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--acc)]">
+            ${opts}
+          </select>
         </td>
-      `).join('');
+      `;
+      }).join('');
       tr.innerHTML = `
         <td class="py-2 pr-2">
           <input type="text" value="${escapeAttr(p.name)}" id="editName_${p.id}" class="w-full min-w-[100px] bg-[#0d1f14] border border-[var(--line)] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--acc)]">
@@ -467,11 +493,11 @@ function renderPlayers(){
       <td class="py-2 pr-2 font-medium">${escapeHtml(p.name)}</td>
       <td class="py-2 pr-2">${p.isGK ? '<span class="tag-gk px-2 py-0.5 rounded-full text-xs">Portiere</span>' : '<span class="text-xs text-[var(--ink-dim)]">Movimento</span>'}</td>
       <td class="py-2 pr-2">${p.group ? `<span class="group-chip" style="background:${gColor}22;color:${gColor};border:1px solid ${gColor}55">${escapeHtml(p.group)}</span>` : '<span class="text-[var(--ink-dim)] text-xs">—</span>'}</td>
-      <td class="py-2 pr-2 text-center">${p.att}</td>
-      <td class="py-2 pr-2 text-center">${p.dif}</td>
-      <td class="py-2 pr-2 text-center">${p.res}</td>
-      <td class="py-2 pr-2 text-center">${p.vel}</td>
-      <td class="py-2 pr-2 text-center">${p.tec}</td>
+      <td class="py-2 pr-2 text-center" title="${ratingLabel(p.att)}">${p.att}</td>
+      <td class="py-2 pr-2 text-center" title="${ratingLabel(p.dif)}">${p.dif}</td>
+      <td class="py-2 pr-2 text-center" title="${ratingLabel(p.res)}">${p.res}</td>
+      <td class="py-2 pr-2 text-center" title="${ratingLabel(p.vel)}">${p.vel}</td>
+      <td class="py-2 pr-2 text-center" title="${ratingLabel(p.tec)}">${p.tec}</td>
       <td class="py-2 pr-2 text-center font-bold" style="color:var(--acc)">${score}</td>
       <td class="py-2 pr-2 text-right whitespace-nowrap">
         <button data-id="${p.id}" class="editBtn text-sm text-[var(--blue)] hover:opacity-70 mr-3" title="Modifica giocatore">✏️</button>
@@ -506,10 +532,7 @@ function renderPlayers(){
       const group = document.getElementById(`editGroup_${id}`).value.trim();
       const data = {name, isGK, group};
       row.querySelectorAll('.editStatInput').forEach(inp=>{
-        let v = parseInt(inp.value, 10);
-        if(isNaN(v)) v = 5;
-        v = Math.min(10, Math.max(1, v));
-        data[inp.dataset.stat] = v;
+        data[inp.dataset.stat] = clampRating(inp.value);
       });
       savePlayerEdits(id, data);
       editingId = null;
