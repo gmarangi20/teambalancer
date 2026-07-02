@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Balancer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚽</text></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap');
+  :root{
+    --pitch:#0d1f14;
+    --pitch2:#122a1a;
+    --line:#2c4a35;
+    --acc:#c8ff4d;
+    --acc-dim:#8fce2a;
+    --blue:#5aa9ff;
+    --red:#ff6b6b;
+    --ink:#e8f5e0;
+    --ink-dim:#8fa896;
+  }
+  body{
+    background:
+      repeating-linear-gradient(0deg, var(--pitch), var(--pitch) 40px, var(--pitch2) 40px, var(--pitch2) 80px);
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+  }
+  h1,h2,.display{font-family:'Space Grotesk',sans-serif;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+  .card{
+    background:rgba(13,31,20,0.85);
+    border:1px solid var(--line);
+    backdrop-filter:blur(4px);
+  }
+  .field-line{border-top:2px dashed var(--line);}
+  input[type=range]{
+    -webkit-appearance:none;
+    height:6px;
+    border-radius:3px;
+    background:var(--line);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px;height:16px;border-radius:50%;
+    background:var(--acc);
+    cursor:pointer;
+    box-shadow:0 0 8px rgba(200,255,77,0.6);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px;height:16px;border-radius:50%;
+    background:var(--acc);border:none;
+    box-shadow:0 0 8px rgba(200,255,77,0.6);
+  }
+  .btn-acc{
+    background:var(--acc);
+    color:#0d1f14;
+    font-weight:700;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .btn-acc:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(200,255,77,0.25);}
+  .btn-acc:active{transform:translateY(0);}
+  .tag-gk{
+    background:rgba(90,169,255,0.15);
+    color:var(--blue);
+    border:1px solid rgba(90,169,255,0.4);
+  }
+  .group-chip{
+    font-size:0.65rem;
+    padding:1px 6px;
+    border-radius:9999px;
+    font-weight:600;
+  }
+  table tbody tr{border-bottom:1px solid var(--line);}
+  table tbody tr:hover{background:rgba(200,255,77,0.04);}
+  .glow-acc{text-shadow:0 0 20px rgba(200,255,77,0.35);}
+  .jersey{
+    clip-path: polygon(20% 0%, 35% 0%, 50% 12%, 65% 0%, 80% 0%, 100% 22%, 85% 38%, 78% 32%, 78% 100%, 22% 100%, 22% 32%, 15% 38%, 0% 22%);
+  }
+  .fade-in{animation:fadeIn .4s ease both;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body class="min-h-screen">
+
+<div class="max-w-6xl mx-auto px-4 py-8 md:py-12">
+
+  <!-- HERO -->
+  <header class="mb-10 flex items-start justify-between flex-wrap gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-9 h-9 jersey bg-[var(--acc)]"></div>
+        <span class="uppercase tracking-[0.3em] text-xs text-[var(--ink-dim)]">Balancer algorithm</span>
+      </div>
+      <h1 class="text-4xl md:text-5xl font-bold display glow-acc">Bilanciatore Squadre</h1>
+      <p class="text-[var(--ink-dim)] mt-2 max-w-lg">Inserisci i giocatori e le loro statistiche, imposta i portieri (se ci sono), eventuali accoppiamenti fissi e scendi in campo con due squadre alla pari.</p>
+    </div>
+    <div class="flex flex-col items-end gap-2">
+      <div id="counterBadge" class="card rounded-2xl px-5 py-3 text-center min-w-[120px]">
+        <div class="text-3xl font-bold display" id="playerCount">0</div>
+        <div class="text-xs text-[var(--ink-dim)] uppercase tracking-wider">Giocatori</div>
+      </div>
+      <div class="card rounded-xl px-3 py-2 flex items-center gap-2">
+        <span class="text-xs text-[var(--ink-dim)] uppercase tracking-wider">Formato</span>
+        <select id="formatSelect" class="bg-[#0a1810] border border-[var(--line)] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--acc)]">
+          <option value="5">5 vs 5</option>
+          <option value="6">6 vs 6</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- SPIEGAZIONE -->
+  <section class="card rounded-2xl mb-6 overflow-hidden">
+    <button id="howItWorksToggle" class="w-full flex items-center justify-between px-5 md:px-6 py-4 text-left">
+      <span class="font-bold display flex items-center gap-2"><span style="color:var(--acc)">ℹ</span> Come funziona (gruppi + algoritmo)</span>
+      <span id="howItWorksArrow" class="text-[var(--ink-dim)] transition-transform">▾</span>
+    </button>
+    <div id="howItWorksBody" class="hidden px-5 md:px-6 pb-6 text-sm text-[var(--ink-dim)] space-y-4 leading-relaxed">
+      <div>
+        <h3 class="text-[var(--ink)] font-semibold mb-1">1. Il campo "Gruppo / Relazione"</h3>
+        <p>Scrivi la stessa parola nel campo "Gruppo" per tutti i giocatori che vuoi tenere insieme, nella <strong>stessa squadra</strong>. Esempio: se Marco, Luca e Sara scrivono tutti <code class="px-1 rounded bg-[#0a1810]">amici1</code>, l'algoritmo li terrà uniti in Squadra A oppure tutti in Squadra B. Puoi creare più gruppi diversi (es. <code class="px-1 rounded bg-[#0a1810]">amici1</code>, <code class="px-1 rounded bg-[#0a1810]">amici2</code>): ogni gruppo è un blocco a sé, indipendente dagli altri. Chi non ha nessun gruppo viene spostato liberamente per bilanciare.</p>
+        <p class="mt-1">Limite: un gruppo non può avere più persone della dimensione di una squadra (5 in formato 5vs5, 6 in formato 6vs6), altrimenti non entrerebbe in nessuna squadra e viene ignorato con un avviso.</p>
+      </div>
+      <div>
+        <h3 class="text-[var(--ink)] font-semibold mb-1">2. Punteggio di ogni giocatore</h3>
+        <p>Ogni giocatore ha uno Score, basato sulla media pesata delle 5 statistiche. Attacco, Difesa e Tecnica contano un po' di più (peso 1.0), Resistenza e Velocità un po' meno (peso 0.8), perché nel 5vs5 incidono meno del gioco tecnico e di forza.</p>
+        <p class="mt-1">Attenzione: lo Score da solo può essere ingannevole. Un giocatore con 10/10/10/1/1 ha lo stesso Score medio di uno con 6/6/6/6/6, ma in campo si comportano in modo molto diverso (uno specialista sbilanciato contro un giocatore completo). Per questo, quando sceglie come dividere le squadre, l'algoritmo <strong>non guarda solo il punteggio totale</strong>: confronta anche il totale di ogni singola statistica tra le due squadre (Attacco vs Attacco, Difesa vs Difesa, ecc.), così evita di far finire per errore tutti i giocatori "specialisti" nella stessa squadra anche quando i punteggi medi sembrerebbero già pari. La differenza mostrata nei risultati resta comunque quella sul punteggio totale, per semplicità di lettura.</p>
+      </div>
+      <div>
+        <h3 class="text-[var(--ink)] font-semibold mb-1">3. Come vengono formate le squadre</h3>
+        <p><strong>Senza gruppi:</strong> puoi scegliere il formato 5vs5 (servono 10 giocatori) o 6vs6 (servono 12 giocatori) con il selettore "Formato" in alto. Il programma calcola tutti i modi possibili di dividere i giocatori selezionati in due squadre della dimensione scelta (252 combinazioni per il 5vs5, 924 per il 6vs6) e sceglie quella con la differenza di punteggio totale più piccola. Se ci sono esattamente 2 portieri fissi, scarta automaticamente le combinazioni che li metterebbero nella stessa squadra. Se i portieri sono alla pari, lasciare le impostazioni di default, altrimnenti bilanciare tramite una sola delle variabili.</p>
+        <p class="mt-1"><strong>Con gruppi:</strong> ogni gruppo diventa un "blocco" che non si può spezzare. Il programma prova tutte le combinazioni possibili di blocchi (invece che di singoli giocatori), cercando comunque quella più equilibrata tra le opzioni che danno esattamente 5 giocatori per squadra.</p>
+      </div>
+      <div>
+        <h3 class="text-[var(--ink)] font-semibold mb-1">4. Cosa succede se i gruppi squilibrano troppo</h3>
+        <p>Il programma confronta il risultato "con gruppi" con quello "libero" (senza vincoli). Se rispettare i gruppi peggiora troppo l'equilibrio, ti mostra un avviso con entrambe le differenze di punteggio, così scegli tu se preferire l'equilibrio o tenere gli amici insieme. Se la differenza è simile, ti mostra direttamente la versione con i gruppi.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FORM AGGIUNTA GIOCATORE -->
+  <section class="card rounded-2xl p-5 md:p-6 mb-6">
+    <h2 class="text-lg font-bold display mb-4 flex items-center gap-2">
+      <span class="text-[var(--acc)]">＋</span> Nuovo giocatore
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs uppercase tracking-wider text-[var(--ink-dim)] block mb-1">Nome</label>
+          <input id="pName" type="text" placeholder="Es. Marco" class="w-full bg-[#0a1810] border border-[var(--line)] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--acc)] focus:border-transparent">
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input id="pIsGK" type="checkbox" class="w-4 h-4 accent-[var(--blue)]">
+          <span class="text-sm">È portiere fisso</span>
+        </label>
+        <div>
+          <label class="text-xs uppercase tracking-wider text-[var(--ink-dim)] block mb-1">Gruppo / Relazione (opzionale)</label>
+          <input id="pGroup" type="text" placeholder="Es. 'Amici Marco' — stessa parola = stessa squadra" class="w-full bg-[#0a1810] border border-[var(--line)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--acc)] focus:border-transparent">
+          <p class="text-xs text-[var(--ink-dim)] mt-1">Giocatori con lo stesso nome di gruppo verranno tenuti insieme, se possibile.</p>
+        </div>
+      </div>
+      <div class="space-y-3">
+        <div id="slidersWrap" class="space-y-3"></div>
+      </div>
+    </div>
+    <button id="addPlayerBtn" class="btn-acc mt-5 w-full md:w-auto px-8 py-2.5 rounded-lg">Aggiungi alla lista</button>
+    <p id="formError" class="text-[var(--red)] text-sm mt-2 hidden"></p>
+  </section>
+
+  <!-- TABELLA GIOCATORI -->
+  <section class="card rounded-2xl p-5 md:p-6 mb-6">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <h2 class="text-lg font-bold display">Roster</h2>
+      <div class="flex gap-2">
+        <button id="clearAllBtn" class="text-xs px-3 py-1.5 rounded-lg border border-[var(--line)] text-[var(--ink-dim)] hover:border-[var(--red)] hover:text-[var(--red)] transition">Svuota lista</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[720px]">
+        <thead>
+          <tr class="text-left text-[var(--ink-dim)] uppercase text-xs tracking-wider">
+            <th class="py-2 pr-2">Nome</th>
+            <th class="py-2 pr-2">Ruolo</th>
+            <th class="py-2 pr-2">Gruppo</th>
+            <th class="py-2 pr-2 text-center">ATT</th>
+            <th class="py-2 pr-2 text-center">DIF</th>
+            <th class="py-2 pr-2 text-center">RES</th>
+            <th class="py-2 pr-2 text-center">VEL</th>
+            <th class="py-2 pr-2 text-center">TEC</th>
+            <th class="py-2 pr-2 text-center font-bold">Score</th>
+            <th class="py-2 pr-2 text-right">Azioni</th>
+          </tr>
+        </thead>
+        <tbody id="playersTbody"></tbody>
+      </table>
+      <p id="emptyMsg" class="text-[var(--ink-dim)] text-sm py-6 text-center">Nessun giocatore inserito. Aggiungine almeno 10 per generare le squadre.</p>
+    </div>
+  </section>
+
+  <!-- GENERA -->
+  <section class="text-center mb-8">
+    <button id="generateBtn" class="btn-acc px-10 py-3.5 rounded-xl text-lg">⚽ <span id="generateBtnLabel">Genera Squadre 5vs5</span></button>
+    <p id="generateWarning" class="text-[var(--red)] text-sm mt-3 hidden"></p>
+  </section>
+
+  <!-- RISULTATI -->
+  <section id="resultsSection" class="hidden fade-in">
+    <div id="relationNotice" class="hidden card border-l-4 border-l-[var(--acc)] rounded-xl p-4 mb-6 text-sm"></div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="card rounded-2xl p-5 relative overflow-hidden">
+        <div class="field-line absolute left-1/2 top-0 bottom-0 hidden md:block"></div>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-bold display" style="color:var(--acc)">Squadra A</h3>
+          <div class="text-right">
+            <div class="text-2xl font-bold display" id="teamAScore">0</div>
+            <div class="text-xs text-[var(--ink-dim)]">punti totali</div>
+          </div>
+        </div>
+        <ul id="teamAList" class="space-y-2"></ul>
+      </div>
+      <div class="card rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-bold display" style="color:var(--blue)">Squadra B</h3>
+          <div class="text-right">
+            <div class="text-2xl font-bold display" id="teamBScore">0</div>
+            <div class="text-xs text-[var(--ink-dim)]">punti totali</div>
+          </div>
+        </div>
+        <ul id="teamBList" class="space-y-2"></ul>
+      </div>
+    </div>
+    <div class="text-center mt-6">
+      <span class="text-[var(--ink-dim)] text-sm">Differenza squadre: </span>
+      <span id="diffScore" class="font-bold" style="color:var(--acc)">0</span>
+    </div>
+
+    <!-- ALTERNATIVA SENZA GRUPPI -->
+    <div id="altSplitSection" class="hidden mt-10">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="h-px flex-1 bg-[var(--line)]"></div>
+        <span class="text-xs uppercase tracking-wider text-[var(--ink-dim)]">Alternativa: miglior equilibrio ignorando i gruppi</span>
+        <div class="h-px flex-1 bg-[var(--line)]"></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-90">
+        <div class="card rounded-2xl p-5 border-dashed">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold display" style="color:var(--acc)">Squadra A <span class="text-xs text-[var(--ink-dim)] font-normal">(libera)</span></h3>
+            <div class="text-right">
+              <div class="text-xl font-bold display" id="altTeamAScore">0</div>
+              <div class="text-xs text-[var(--ink-dim)]">punti totali</div>
+            </div>
+          </div>
+          <ul id="altTeamAList" class="space-y-2"></ul>
+        </div>
+        <div class="card rounded-2xl p-5 border-dashed">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold display" style="color:var(--blue)">Squadra B <span class="text-xs text-[var(--ink-dim)] font-normal">(libera)</span></h3>
+            <div class="text-right">
+              <div class="text-xl font-bold display" id="altTeamBScore">0</div>
+              <div class="text-xs text-[var(--ink-dim)]">punti totali</div>
+            </div>
+          </div>
+          <ul id="altTeamBList" class="space-y-2"></ul>
+        </div>
+      </div>
+      <div class="text-center mt-4">
+        <span class="text-[var(--ink-dim)] text-sm">Differenza squadre (senza gruppi): </span>
+        <span id="altDiffScore" class="font-bold" style="color:var(--acc)">0</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+const STATS = [
+  {key:'att', label:'Attacco'},
+  {key:'dif', label:'Difesa'},
+  {key:'res', label:'Resistenza'},
+  {key:'vel', label:'Velocità'},
+  {key:'tec', label:'Tecnica'}
+];
+const WEIGHTS = {att:1, dif:1, res:0.8, vel:0.8, tec:1}; // peso leggermente maggiore su att/dif/tec
+const STORAGE_KEY = 'team_balancer_players_v1';
+
+let players = [];
+let editingId = null;
+let teamSize = 5; // 5 = 5vs5 (10 giocatori), 6 = 6vs6 (12 giocatori)
+const FORMAT_KEY = 'team_balancer_format_v1';
+
+// ---------- Init sliders ----------
+const slidersWrap = document.getElementById('slidersWrap');
+STATS.forEach(s=>{
+  const row = document.createElement('div');
+  row.innerHTML = `
+    <div class="flex items-center justify-between mb-1">
+      <label class="text-xs uppercase tracking-wider text-[var(--ink-dim)]">${s.label}</label>
+      <span class="text-sm font-bold" style="color:var(--acc)" id="val_${s.key}">5</span>
+    </div>
+    <input type="range" min="1" max="10" value="5" id="slider_${s.key}" class="w-full">
+  `;
+  slidersWrap.appendChild(row);
+});
+STATS.forEach(s=>{
+  document.getElementById(`slider_${s.key}`).addEventListener('input', e=>{
+    document.getElementById(`val_${s.key}`).textContent = e.target.value;
+  });
+});
+
+// ---------- Persistence ----------
+function saveToStorage(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(players));
+    localStorage.setItem(FORMAT_KEY, String(teamSize));
+  }catch(e){}
+}
+function loadFromStorage(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) players = JSON.parse(raw);
+    const fmt = localStorage.getItem(FORMAT_KEY);
+    if(fmt && (fmt === '5' || fmt === '6')) teamSize = parseInt(fmt, 10);
+  }catch(e){ players = []; }
+}
+
+function updateFormatUI(){
+  document.getElementById('formatSelect').value = String(teamSize);
+  const totalNeeded = teamSize * 2;
+  document.getElementById('generateBtnLabel').textContent = `Genera Squadre ${teamSize}vs${teamSize}`;
+  document.getElementById('emptyMsg').textContent = `Nessun giocatore inserito. Aggiungine almeno ${totalNeeded} per generare le squadre.`;
+}
+
+// ---------- Score ----------
+function computeScore(p){
+  let sum = 0, wsum = 0;
+  STATS.forEach(s=>{
+    sum += p[s.key] * WEIGHTS[s.key];
+    wsum += WEIGHTS[s.key];
+  });
+  return +(sum / wsum).toFixed(2);
+}
+
+// ---------- Add player ----------
+document.getElementById('addPlayerBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('pName').value.trim();
+  const errEl = document.getElementById('formError');
+  if(!name){
+    errEl.textContent = 'Inserisci un nome valido.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  errEl.classList.add('hidden');
+  const isGK = document.getElementById('pIsGK').checked;
+  const group = document.getElementById('pGroup').value.trim();
+  const stats = {};
+  STATS.forEach(s=>{
+    stats[s.key] = parseInt(document.getElementById(`slider_${s.key}`).value, 10);
+  });
+  const player = {
+    id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    name, isGK, group,
+    ...stats
+  };
+  players.push(player);
+  saveToStorage();
+  renderPlayers();
+  document.getElementById('pName').value = '';
+  document.getElementById('pIsGK').checked = false;
+  document.getElementById('pGroup').value = '';
+  STATS.forEach(s=>{
+    document.getElementById(`slider_${s.key}`).value = 5;
+    document.getElementById(`val_${s.key}`).textContent = 5;
+  });
+  document.getElementById('resultsSection').classList.add('hidden');
+});
+
+document.getElementById('formatSelect').addEventListener('change', (e)=>{
+  teamSize = parseInt(e.target.value, 10);
+  saveToStorage();
+  updateFormatUI();
+  document.getElementById('resultsSection').classList.add('hidden');
+});
+
+document.getElementById('clearAllBtn').addEventListener('click', ()=>{
+  if(players.length===0) return;
+  if(confirm('Vuoi svuotare l\'intera lista giocatori?')){
+    players = [];
+    saveToStorage();
+    renderPlayers();
+    document.getElementById('resultsSection').classList.add('hidden');
+  }
+});
+
+function deletePlayer(id){
+  players = players.filter(p=>p.id!==id);
+  if(editingId === id) editingId = null;
+  saveToStorage();
+  renderPlayers();
+  document.getElementById('resultsSection').classList.add('hidden');
+}
+
+function savePlayerEdits(id, data){
+  const p = players.find(pl=>pl.id===id);
+  if(!p) return;
+  p.name = data.name;
+  p.isGK = data.isGK;
+  p.group = data.group;
+  STATS.forEach(s=>{ p[s.key] = data[s.key]; });
+  saveToStorage();
+}
+
+// ---------- Render ----------
+const groupColors = ['#c8ff4d','#5aa9ff','#ff9f5a','#ff6bd6','#7bffb0','#ffe45a'];
+function colorForGroup(g){
+  if(!g) return null;
+  let hash = 0;
+  for(let i=0;i<g.length;i++) hash = g.charCodeAt(i) + ((hash<<5)-hash);
+  return groupColors[Math.abs(hash) % groupColors.length];
+}
+
+function renderPlayers(){
+  const tbody = document.getElementById('playersTbody');
+  tbody.innerHTML = '';
+  document.getElementById('playerCount').textContent = players.length;
+  document.getElementById('emptyMsg').classList.toggle('hidden', players.length>0);
+
+  players.forEach(p=>{
+    const tr = document.createElement('tr');
+
+    if(editingId === p.id){
+      // ---- RIGA IN MODALITÀ MODIFICA ----
+      tr.className = 'bg-[#0a1810]';
+      const statCells = STATS.map(s=>`
+        <td class="py-2 pr-2 text-center">
+          <input type="number" min="1" max="10" value="${p[s.key]}" data-stat="${s.key}" class="editStatInput w-12 text-center bg-[#0d1f14] border border-[var(--line)] rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--acc)]">
+        </td>
+      `).join('');
+      tr.innerHTML = `
+        <td class="py-2 pr-2">
+          <input type="text" value="${escapeAttr(p.name)}" id="editName_${p.id}" class="w-full min-w-[100px] bg-[#0d1f14] border border-[var(--line)] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--acc)]">
+        </td>
+        <td class="py-2 pr-2">
+          <label class="flex items-center gap-1 text-xs cursor-pointer select-none">
+            <input type="checkbox" id="editGK_${p.id}" class="w-4 h-4 accent-[var(--blue)]" ${p.isGK ? 'checked' : ''}>
+            Portiere
+          </label>
+        </td>
+        <td class="py-2 pr-2">
+          <input type="text" value="${escapeAttr(p.group||'')}" id="editGroup_${p.id}" placeholder="—" class="w-full min-w-[90px] bg-[#0d1f14] border border-[var(--line)] rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--acc)]">
+        </td>
+        ${statCells}
+        <td class="py-2 pr-2 text-center font-bold" style="color:var(--acc)">—</td>
+        <td class="py-2 pr-2 text-right whitespace-nowrap">
+          <button data-id="${p.id}" class="saveBtn text-xs text-[var(--acc)] hover:underline mr-3">✓ Salva</button>
+          <button data-id="${p.id}" class="cancelBtn text-xs text-[var(--ink-dim)] hover:underline">✕ Annulla</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+      return;
+    }
+
+    // ---- RIGA NORMALE ----
+    const score = computeScore(p);
+    const gColor = colorForGroup(p.group);
+    tr.innerHTML = `
+      <td class="py-2 pr-2 font-medium">${escapeHtml(p.name)}</td>
+      <td class="py-2 pr-2">${p.isGK ? '<span class="tag-gk px-2 py-0.5 rounded-full text-xs">Portiere</span>' : '<span class="text-xs text-[var(--ink-dim)]">Movimento</span>'}</td>
+      <td class="py-2 pr-2">${p.group ? `<span class="group-chip" style="background:${gColor}22;color:${gColor};border:1px solid ${gColor}55">${escapeHtml(p.group)}</span>` : '<span class="text-[var(--ink-dim)] text-xs">—</span>'}</td>
+      <td class="py-2 pr-2 text-center">${p.att}</td>
+      <td class="py-2 pr-2 text-center">${p.dif}</td>
+      <td class="py-2 pr-2 text-center">${p.res}</td>
+      <td class="py-2 pr-2 text-center">${p.vel}</td>
+      <td class="py-2 pr-2 text-center">${p.tec}</td>
+      <td class="py-2 pr-2 text-center font-bold" style="color:var(--acc)">${score}</td>
+      <td class="py-2 pr-2 text-right whitespace-nowrap">
+        <button data-id="${p.id}" class="editBtn text-sm text-[var(--blue)] hover:opacity-70 mr-3" title="Modifica giocatore">✏️</button>
+        <button data-id="${p.id}" class="delBtn text-xs text-[var(--red)] hover:underline">Elimina</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.delBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=> deletePlayer(btn.dataset.id));
+  });
+  tbody.querySelectorAll('.editBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      editingId = btn.dataset.id;
+      renderPlayers();
+    });
+  });
+  tbody.querySelectorAll('.cancelBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      editingId = null;
+      renderPlayers();
+    });
+  });
+  tbody.querySelectorAll('.saveBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.dataset.id;
+      const row = btn.closest('tr');
+      const name = document.getElementById(`editName_${id}`).value.trim();
+      if(!name){ alert('Il nome non può essere vuoto.'); return; }
+      const isGK = document.getElementById(`editGK_${id}`).checked;
+      const group = document.getElementById(`editGroup_${id}`).value.trim();
+      const data = {name, isGK, group};
+      row.querySelectorAll('.editStatInput').forEach(inp=>{
+        let v = parseInt(inp.value, 10);
+        if(isNaN(v)) v = 5;
+        v = Math.min(10, Math.max(1, v));
+        data[inp.dataset.stat] = v;
+      });
+      savePlayerEdits(id, data);
+      editingId = null;
+      renderPlayers();
+      document.getElementById('resultsSection').classList.add('hidden');
+    });
+  });
+}
+
+function escapeAttr(str){
+  return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ---------- Balancing algorithm ----------
+// Genera tutte le combinazioni C(10,5) = 252, valuta squilibrio, trova la migliore.
+function combinations(arr, k){
+  const results = [];
+  function helper(start, combo){
+    if(combo.length === k){ results.push([...combo]); return; }
+    for(let i=start;i<arr.length;i++){
+      combo.push(arr[i]);
+      helper(i+1, combo);
+      combo.pop();
+    }
+  }
+  helper(0, []);
+  return results;
+}
+
+// Peso con cui lo squilibrio per singola statistica incide sulla scelta dello split.
+// Il "diff" mostrato all'utente resta sempre la differenza di punteggio totale;
+// "combinedDiff" è usato solo internamente per scegliere lo split migliore.
+const STAT_BALANCE_WEIGHT = 0.4;
+
+function scoreDiffForSplit(selected, teamAIds){
+  const teamA = selected.filter(p=>teamAIds.has(p.id));
+  const teamB = selected.filter(p=>!teamAIds.has(p.id));
+  const sa = teamA.reduce((s,p)=>s+computeScore(p),0);
+  const sb = teamB.reduce((s,p)=>s+computeScore(p),0);
+  const diff = Math.abs(sa-sb);
+
+  // Squilibrio per ciascuna statistica (es. tutti i 10 in Attacco in una squadra).
+  let statDiffSum = 0;
+  STATS.forEach(s=>{
+    const statA = teamA.reduce((sum,p)=>sum+p[s.key],0);
+    const statB = teamB.reduce((sum,p)=>sum+p[s.key],0);
+    statDiffSum += Math.abs(statA-statB) * WEIGHTS[s.key];
+  });
+  const statDiffAvg = statDiffSum / STATS.length;
+  const combinedDiff = diff + STAT_BALANCE_WEIGHT * statDiffAvg;
+
+  return {diff, combinedDiff, sa, sb, teamA, teamB};
+}
+
+// Trova il miglior split libero (senza vincoli di gruppo), rispettando eventuale
+// bilanciamento portieri (se ci sono esattamente 2 GK, uno per squadra).
+function bestFreeSplit(selected){
+  const ids = selected.map(p=>p.id);
+  const combos = combinations(ids, teamSize);
+  let best = null;
+  const gks = selected.filter(p=>p.isGK);
+
+  combos.forEach(comboIds=>{
+    const teamAIds = new Set(comboIds);
+    // vincolo soft: se ci sono esattamente 2 portieri, devono stare in squadre diverse
+    if(gks.length === 2){
+      const gkInA = gks.filter(g=>teamAIds.has(g.id)).length;
+      if(gkInA !== 1) return; // scarta split che mettono entrambi i GK nella stessa squadra
+    }
+    const res = scoreDiffForSplit(selected, teamAIds);
+    if(!best || res.combinedDiff < best.combinedDiff) best = res;
+  });
+
+  // fallback se il vincolo GK ha escluso tutto (es. >2 gk o casi limite)
+  if(!best){
+    combos.forEach(comboIds=>{
+      const teamAIds = new Set(comboIds);
+      const res = scoreDiffForSplit(selected, teamAIds);
+      if(!best || res.combinedDiff < best.combinedDiff) best = res;
+    });
+  }
+  return best;
+}
+
+// Trova il miglior split rispettando i gruppi come blocchi indivisibili.
+function bestGroupedSplit(selected){
+  const groups = {};
+  const solo = [];
+  selected.forEach(p=>{
+    if(p.group){
+      if(!groups[p.group]) groups[p.group] = [];
+      groups[p.group].push(p);
+    } else {
+      solo.push(p);
+    }
+  });
+  const groupBlocks = Object.values(groups);
+  // Se un blocco supera la dimensione di una squadra, è impossibile rispettarlo: segnaliamo fallimento
+  if(groupBlocks.some(b=>b.length>teamSize)) return null;
+
+  const blocks = [...groupBlocks, ...solo.map(p=>[p])];
+  const n = blocks.length;
+  let best = null;
+
+  // proviamo tutte le assegnazioni blocco->squadra (2^n), scartando quelle che non rispettano teamSize vs teamSize
+  const total = 1 << n;
+  for(let mask=0; mask<total; mask++){
+    let teamAIdsArr = [];
+    for(let i=0;i<n;i++){
+      if(mask & (1<<i)) teamAIdsArr.push(...blocks[i].map(p=>p.id));
+    }
+    const teamAIds = new Set(teamAIdsArr);
+    const teamACount = selected.filter(p=>teamAIds.has(p.id)).length;
+    if(teamACount !== teamSize) continue;
+    const res = scoreDiffForSplit(selected, teamAIds);
+    if(!best || res.combinedDiff < best.combinedDiff) best = res;
+  }
+  return best;
+}
+
+document.getElementById('generateBtn').addEventListener('click', ()=>{
+  const warnEl = document.getElementById('generateWarning');
+  const resultsSection = document.getElementById('resultsSection');
+  const relationNotice = document.getElementById('relationNotice');
+  warnEl.classList.add('hidden');
+  relationNotice.classList.add('hidden');
+
+  const totalNeeded = teamSize * 2;
+  if(players.length < totalNeeded){
+    warnEl.textContent = `Servono almeno ${totalNeeded} giocatori per generare le squadre ${teamSize}vs${teamSize}. Attualmente ne hai inseriti ${players.length}.`;
+    warnEl.classList.remove('hidden');
+    resultsSection.classList.add('hidden');
+    return;
+  }
+
+  // Selezioniamo tutti se sono esattamente il numero richiesto,
+  // altrimenti prendiamo i migliori per score (per non escludere a caso).
+  let selected = players;
+  if(players.length > totalNeeded){
+    selected = [...players].sort((a,b)=>computeScore(b)-computeScore(a)).slice(0,totalNeeded);
+  }
+
+  const hasGroups = selected.some(p=>p.group);
+  const freeResult = bestFreeSplit(selected);
+  let finalResult = freeResult;
+  let usedGrouped = false;
+  let showAlt = false;
+
+  if(hasGroups){
+    const groupedResult = bestGroupedSplit(selected);
+    if(groupedResult){
+      // Se la versione con gruppi ha una differenza "accettabile" (entro il 30% in più
+      // rispetto alla versione libera, o comunque non eccessiva), la usiamo e basta.
+      const threshold = Math.max(freeResult.diff * 1.3, freeResult.diff + 1.5);
+      if(groupedResult.diff <= threshold){
+        finalResult = groupedResult;
+        usedGrouped = true;
+      } else {
+        // Squilibrio troppo elevato: mostriamo entrambe le opzioni
+        finalResult = groupedResult;
+        usedGrouped = true;
+        showAlt = true;
+        relationNotice.classList.remove('hidden');
+        relationNotice.innerHTML = `
+          <strong style="color:var(--acc)">⚠ Le relazioni di gruppo squilibrano le squadre.</strong><br>
+          Rispettando i gruppi indicati, la differenza tra le squadre è di <strong>${groupedResult.diff.toFixed(2)}</strong> punti.
+          Ignorando le relazioni, l'algoritmo troverebbe un equilibrio molto migliore con una differenza di
+          <strong>${freeResult.diff.toFixed(2)}</strong> punti.<br>
+          <span class="text-[var(--ink-dim)]">Sotto trovi entrambe le composizioni: quella che rispetta i gruppi (sopra) e la migliore possibile ignorandoli (sotto).</span>
+        `;
+      }
+    } else {
+      // gruppo troppo grande: impossibile rispettarlo
+      showAlt = false;
+      relationNotice.classList.remove('hidden');
+      relationNotice.innerHTML = `<strong style="color:var(--red)">⚠ Impossibile rispettare le relazioni:</strong> uno dei gruppi ha più giocatori della dimensione di una squadra, quindi non può stare tutto insieme. Viene mostrata la composizione bilanciata libera.`;
+    }
+  }
+
+  renderTeams(finalResult);
+  document.getElementById('altSplitSection').classList.toggle('hidden', !showAlt);
+  if(showAlt) renderTeams(freeResult, true);
+  resultsSection.classList.remove('hidden');
+  resultsSection.scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+function renderTeams(result, isAlt){
+  const {teamA, teamB, sa, sb, diff} = result;
+  const ids = isAlt
+    ? {scoreA:'altTeamAScore', scoreB:'altTeamBScore', diff:'altDiffScore', listA:'altTeamAList', listB:'altTeamBList'}
+    : {scoreA:'teamAScore', scoreB:'teamBScore', diff:'diffScore', listA:'teamAList', listB:'teamBList'};
+
+  document.getElementById(ids.scoreA).textContent = sa.toFixed(2);
+  document.getElementById(ids.scoreB).textContent = sb.toFixed(2);
+  document.getElementById(ids.diff).textContent = diff.toFixed(2);
+
+  const listA = document.getElementById(ids.listA);
+  const listB = document.getElementById(ids.listB);
+  listA.innerHTML = '';
+  listB.innerHTML = '';
+
+  [[teamA, listA],[teamB, listB]].forEach(([team, listEl])=>{
+    team.sort((a,b)=>computeScore(b)-computeScore(a)).forEach(p=>{
+      const li = document.createElement('li');
+      li.className = 'flex items-center justify-between bg-[#0a1810] rounded-lg px-3 py-2 border border-[var(--line)]';
+      const gColor = colorForGroup(p.group);
+      li.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="font-medium">${escapeHtml(p.name)}</span>
+          ${p.isGK ? '<span class="tag-gk px-2 py-0.5 rounded-full text-xs">P</span>' : ''}
+          ${p.group ? `<span class="group-chip" style="background:${gColor}22;color:${gColor};border:1px solid ${gColor}55">${escapeHtml(p.group)}</span>` : ''}
+        </div>
+      `;
+      listEl.appendChild(li);
+    });
+  });
+}
+
+// ---------- Toggle spiegazione ----------
+document.getElementById('howItWorksToggle').addEventListener('click', ()=>{
+  const body = document.getElementById('howItWorksBody');
+  const arrow = document.getElementById('howItWorksArrow');
+  body.classList.toggle('hidden');
+  arrow.style.transform = body.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+});
+
+// ---------- Init ----------
+loadFromStorage();
+updateFormatUI();
+renderPlayers();
+</script>
+</body>
+</html>
