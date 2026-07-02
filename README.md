@@ -27,6 +27,3 @@ Basta aprire `index.html` in un browser — funziona anche offline (a parte il c
 5. **Gruppi/relazioni**: i giocatori con lo stesso "Gruppo" vengono trattati come blocchi indivisibili; l'algoritmo cerca la combinazione di blocchi più equilibrata con la stessa metrica.
 6. **Squilibrio da gruppi**: se rispettare i gruppi peggiora troppo l'equilibrio rispetto alla soluzione libera, l'app mostra entrambe le composizioni, lasciando a te la scelta.
 
-## Deploy su GitHub Pages
-
-È un progetto **completamente statico** (un solo file `.html`, nessun server, nessuna variabile d'ambiente, nessun database): GitHub Pages è la soluzione più semplice e gratuita.
