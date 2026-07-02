@@ -452,8 +452,8 @@ function renderPlayers(){
         ${statCells}
         <td class="py-2 pr-2 text-center font-bold" style="color:var(--acc)">—</td>
         <td class="py-2 pr-2 text-right whitespace-nowrap">
-          <button data-id="${p.id}" class="saveBtn text-xs text-[var(--acc)] hover:underline mr-3">✓ Salva</button>
-          <button data-id="${p.id}" class="cancelBtn text-xs text-[var(--ink-dim)] hover:underline">✕ Annulla</button>
+          <button data-id="${p.id}" class="saveBtn text-xs text-[var(--acc)] hover:underline mr-3"> Salva</button>
+          <button data-id="${p.id}" class="cancelBtn text-xs text-[var(--ink-dim)] hover:underline"> Annulla</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -613,8 +613,8 @@ function bestGroupedSplit(selected){
     }
   });
   const groupBlocks = Object.values(groups);
-  // Se un blocco supera la dimensione di una squadra, è impossibile rispettarlo: segnaliamo fallimento
-  if(groupBlocks.some(b=>b.length>teamSize)) return null;
+  // Caso 1: un singolo gruppo ha più persone della dimensione di una squadra → impossibile in assoluto.
+  if(groupBlocks.some(b=>b.length>teamSize)) return {result:null, reason:'block-too-big'};
 
   const blocks = [...groupBlocks, ...solo.map(p=>[p])];
   const n = blocks.length;
@@ -633,7 +633,10 @@ function bestGroupedSplit(selected){
     const res = scoreDiffForSplit(selected, teamAIds);
     if(!best || res.combinedDiff < best.combinedDiff) best = res;
   }
-  return best;
+  // Caso 2: ogni gruppo singolarmente entrerebbe in una squadra, ma le dimensioni dei gruppi
+  // (es. 3 + 3 + 4 su un 5vs5) non si combinano in nessun modo per arrivare a teamSize esatti.
+  if(!best) return {result:null, reason:'no-combination'};
+  return {result:best, reason:null};
 }
 
 document.getElementById('generateBtn').addEventListener('click', ()=>{
@@ -665,7 +668,8 @@ document.getElementById('generateBtn').addEventListener('click', ()=>{
   let showAlt = false;
 
   if(hasGroups){
-    const groupedResult = bestGroupedSplit(selected);
+    const groupedOutcome = bestGroupedSplit(selected);
+    const groupedResult = groupedOutcome.result;
     if(groupedResult){
       // Se la versione con gruppi ha una differenza "accettabile" (entro il 30% in più
       // rispetto alla versione libera, o comunque non eccessiva), la usiamo e basta.
@@ -687,11 +691,17 @@ document.getElementById('generateBtn').addEventListener('click', ()=>{
           <span class="text-[var(--ink-dim)]">Sotto trovi entrambe le composizioni: quella che rispetta i gruppi (sopra) e la migliore possibile ignorandoli (sotto).</span>
         `;
       }
-    } else {
-      // gruppo troppo grande: impossibile rispettarlo
-      showAlt = false;
+    } else if(groupedOutcome.reason === 'block-too-big'){
+      // un singolo gruppo ha più persone della dimensione di una squadra
+      showAlt = true;
       relationNotice.classList.remove('hidden');
-      relationNotice.innerHTML = `<strong style="color:var(--red)">⚠ Impossibile rispettare le relazioni:</strong> uno dei gruppi ha più giocatori della dimensione di una squadra, quindi non può stare tutto insieme. Viene mostrata la composizione bilanciata libera.`;
+      relationNotice.innerHTML = `<strong style="color:var(--red)">⚠ Impossibile rispettare le relazioni:</strong> uno dei gruppi ha più giocatori della dimensione di una squadra (${teamSize}), quindi non può stare tutto insieme in un'unica squadra. Sotto trovi la composizione bilanciata libera.`;
+    } else {
+      // i gruppi, presi singolarmente, andrebbero bene, ma le loro dimensioni non si combinano
+      // in nessun modo per formare esattamente due squadre da teamSize giocatori
+      showAlt = true;
+      relationNotice.classList.remove('hidden');
+      relationNotice.innerHTML = `<strong style="color:var(--red)">⚠ Impossibile rispettare tutte le relazioni insieme:</strong> le dimensioni dei gruppi che hai creato non si possono combinare per formare due squadre esattamente da ${teamSize} giocatori (es. gruppi da 3+3+4 non si dividono in due metà da 5). Sotto trovi la composizione bilanciata libera; prova a modificare qualche gruppo se vuoi rispettarli tutti.`;
     }
   }
 
